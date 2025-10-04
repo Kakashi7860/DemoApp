@@ -1,46 +1,43 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const helmet = require('helmet');
-const connectDB = require('./config/db');
+import axios from 'axios';
 
-// Load env vars
-dotenv.config();
+const API_URL = 'http://localhost:5000/api';
 
-// Connect to database
-connectDB();
-
-const app = express();
-
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
-// Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/tasks', require('./routes/taskRoutes'));
-
-// Home route
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'TaskFlow API is running',
-    version: '1.0.0'
-  });
+// Create axios instance
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false, 
-    message: 'Something went wrong!' 
-  });
-});
+// Add token to requests
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
-const PORT = process.env.PORT || 5000;
+// Auth API
+export const authAPI = {
+  register: (userData) => api.post('/auth/register', userData),
+  login: (userData) => api.post('/auth/login', userData),
+  getMe: () => api.get('/auth/me'),
+};
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
+// Tasks API
+export const tasksAPI = {
+  getTasks: () => api.get('/tasks'),
+  getTask: (id) => api.get(`/tasks/${id}`),
+  createTask: (taskData) => api.post('/tasks', taskData),
+  updateTask: (id, taskData) => api.put(`/tasks/${id}`, taskData),
+  deleteTask: (id) => api.delete(`/tasks/${id}`),
+};
+
+export default api;
